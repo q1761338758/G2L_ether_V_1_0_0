@@ -1,0 +1,69 @@
+
+RZ/G2L dual-os on dual-cortex-a55.
+Background:
+	Many industrial automation customers need high performance and high real-timer performance at the same time. The RZ/G2L Linux kernel with real-time patch can not fullfill it very well.
+Requirements:
+1) CPU0 runs on Linux kernel
+2) CPU1 runs on bare-metal system or RTOS.
+3) CPU0 and CPU1 can communicate with each other by SGI interrupt and shared memory.
+4) Peripheral device drivers need to be ported to CPU1 bare-metal(RTOS) environment, such as Ethernet, QSPI, Timer....
+5) Floating point(FPU, NEON) must be supported on both CPU cores.
+
+
+-----------------------------------------------------
+Released on 11/Oct, 2021
+
+Supported features:
+1) Boot CPU1 from uboot(usually used for debug).
+1.1) Download 'rzg2l-cpu1-firmware.uboot.bin' to 0x4A000000
+1.2) go 0x4A000000
+
+2) Download firmware in uboot and boot CPU1 under Linux
+2.1) Download 'rzg2l-cpu1-firmware.bin' to 0x4A100000
+2.2) Run dual-os-server app under Linux
+
+3) GIC SGI interrupt is supported. SGI interrupts can be sent between the two CPU cores after the two systems booting up.
+
+4) Shared memory can be accessed by the two CPU cores after the two systems booting up.
+
+5) The PMOD1 SCIF2 on Renesas SMARC board is used as CPU1's debug port. SCIF2 TX is used only(polling mode).
+
+6) The firmware had been tested on RZ/G2L 4.19-cip33 Linux kernel and RZ/G2L WS1 chip version. The "nr_cpus=1" uboot boot param must be used(bootargs).
+
+7) Floating point is supported by using libm. NEON can also be supported(depending on source code and compile options).
+
+8) Windows version ARMv8 bare-metal toolchain(download from www.arm.com) is used:
+	gcc-arm-10.2-2020.11-mingw-w64-i686-aarch64-none-elf
+
+
+-----------------------------------------------------
+Released on 10/Apri, 2023.
+
+Supported features:
+1) Boot CPU1 in uboot by cmd 'smc'. 'CONFIG_CMD_SMC=y' is required in uboot defconfig.
+Steps:
+1.1) loadb/tftp/nfs load-addr rzg2l-cpu1-firmware.bin
+1.2) dcache flush
+1.3) smc 0xc4000003 0x100 load-addr
+NOTE:
+a) The binary file must be 'rzg2l-cpu1-firmware.bin', NOT 'rzg2l-cpu1-firmware.uboot.bin'.
+b) The load-addr is not needed to be 0x4a100000(start address by linker), you can also use 0x48000000. because of the position independent code.
+c) The old style boot method can also be used:
+Download 'rzgl2-cpu1-firmware.uboot.bin' to 0x4A000000, and 'go 0x4A000000'.
+(uboot does not need to be modified for this method)
+
+2) Downloading CPU1 firmware to boot address of DDR under Linux command line is supported now. Booting CPU1 under Linux is only supported in previous release.
+Please refer to the server.c source code.
+Run dual-os-server app, the 'rzg2l-cpu1-firmware.bin' will be loaded to 0x4A100000 physical address and the CPU1 will be brought up.
+NOTE:
+Don't use 'rzg2l-cpu1-firmware.uboot.bin', this binary is noly used in uboot with the old style method.
+
+3) GIC SPI interrupt type is supported now. The GIC SGI interrut had been supported before, so SPI and SGI interrupt types are both supported now.
+Because the whole debug process was done on Renesas SMARC board, the SCIF2 DRI interrupt(RX interrupt type) is used for convenience.
+Please refer to the firmware/driver/scif.c and firmware/arch/interrupt.c.
+
+4) The firmware had been tested on RZ/G2L VLP 5.10-cip13-rt5 Linux kernel. Please refer to the patches. The "nr_cpus=1" uboot boot param is not needed.
+
+5) Some section address changed in config.mk.
+
+6) Patch file name with ".ws1" is used for RZ/G2L early WS1 chip version, and the file name without ".ws1" is used for RZ/G2L WS2+ chip versions. The pre-built Image.ws1 is the same.
